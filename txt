@@ -1,0 +1,41 @@
+smart_farm_ai/
+│
+├── app.py                                # Streamlit app (2 tabs: Health, Recommendation)
+├── requirements.txt                      # deps (chromadb, langchain, tensorflow, etc.)
+├── README.md
+│
+├── model/
+│   ├── smartfarm_cnn_best_model.keras    # trained CNN from Colab
+│   └── class_indices.json                # saved mapping from Colab
+│
+├── data/
+│   ├── kb_source/                        # human-readable KB sources (CSV/JSON/MD)
+│   │   ├── diseases.csv                  # core disease entries (disease, symptoms, treatment)
+│   │   └── recommendations.csv           # crop recommendation facts / rules
+│   └── uploads/                          # uploaded user images (optional)
+│
+├── core/
+│   ├── feature_extractor.py              # loads model, returns embedding for an image
+│   ├── predict.py                        # wrapper: load model -> predict class + confidence
+│
+├── rag/                                   # everything RAG / ChromaDB related
+│   ├── chroma_setup.py                   # create client, create/get collection helper
+│   ├── embedder.py                       # embed text and images (wrapper for chosen embedder)
+│   ├── ingest_kb.py                      # converts `data/kb_source/*` -> embeddings -> stores in Chroma
+│   ├── query_kb.py                       # query functions: similarity_search + return metadata
+│   └── utils.py                          # small helpers (serialize, normalize text, thresholds)
+│
+├── ai_modules/
+│   ├── llm_client.py                     # Gemini/Grok wrapper (send prompts, handle fallback)
+│   └── prompt_templates.py               # reusable prompts (explain disease, recommend crops)
+│
+├── services/
+│   ├── memory_service.py                 # high-level APIs: get_previous_diagnosis(image_embedding)
+│   └── hybrid_predictor.py               # orchestrates: CNN -> Chroma lookup -> LLM fallback -> store
+│
+├── utils/
+│   ├── image_utils.py                    # loading, resize, normalize images
+│   └── i18n.py                           # simple translation / language helpers for farmers
+│
+└── logs/
+    └── ingestion/                        # logs from KB ingestion (timestamps, counts)

@@ -1,0 +1,31 @@
+id,crop_name,disease_name,symptoms,possible_causes,treatment,recommended_crops
+1,Tomato,Early Blight,Dark concentric spots on older leaves,Fungal infection caused by Alternaria solani,Use Mancozeb or Chlorothalonil spray; avoid overhead irrigation,Chilli,Brinjal,Capsicum,Onion,Garlic
+2,Potato,Late Blight,Brownish-black patches on leaves and stems,Phytophthora infestans fungus in humid conditions,Use Ridomil Gold MZ fungicide; ensure proper drainage,Tomato,Pea,Cabbage,Cauliflower,Carrot
+3,Rice,Leaf Blast,Grayish lesions with brown borders on leaves,Magnaporthe oryzae fungus,Spray Tricyclazole; maintain balanced nitrogen fertilizer,Wheat,Maize,Green gram,Mustard,Chickpea
+4,Cotton,Leaf Curl Virus,Curling of young leaves and stunted growth,Whitefly-transmitted virus,Use Imidacloprid or Thiamethoxam; control whitefly population,Soybean,Groundnut,Pigeon pea,Sorghum,Bajra
+5,Maize,Turcicum Leaf Blight,Elliptical gray-green lesions on leaves,Exserohilum turcicum fungus,Spray Mancozeb; rotate crops with legumes,Rice,Wheat,Soybean,Groundnut,Moong
+6,Mango,Powdery Mildew,White powdery coating on leaves and flowers,Oidium mangiferae fungus,Use Wettable Sulphur or Carbendazim spray,Guava,Papaya,Banana,Lemon,Sapota
+7,Banana,Bunchy Top Virus,Dark green streaks on leaves and bunched growth,Banana bunchy top virus via aphids,Remove infected plants; use virus-free suckers,Papaya,Mango,Coconut,Areca nut,Betel nut
+8,Wheat,Rust Disease,Orange or brown pustules on leaves,Puccinia fungus,Use Propiconazole or Mancozeb; resistant varieties,Rice,Maize,Barley,Gram,Mustard
+9,Brinjal,Fruit and Shoot Borer,Holes in fruits and drooping shoots,Leucinodes orbonalis moth larvae,Use Neem oil spray or Carbaryl; destroy affected shoots,Tomato,Chilli,Okra,Cabbage,Cauliflower
+10,Sugarcane,Red Rot,Red discolouration in stalks and white patches,Colletotrichum falcatum fungus,Use Bavistin; plant resistant varieties,Maize,Sorghum,Rice,Groundnut,Soybean
+11,Chilli,Anthracnose,Sunken dark lesions on fruits,Colletotrichum capsici fungus,Use Copper oxychloride or Mancozeb spray,Tomato,Brinjal,Okra,Capsicum,Garlic
+12,Groundnut,Tikka Disease,Brown spots with yellow halos on leaves,Cercospora arachidicola fungus,Use Mancozeb or Chlorothalonil spray; remove debris,Soybean,Maize,Sunflower,Pigeon pea
+13,Soybean,Yellow Mosaic Virus,Yellow patches on leaves and stunted growth,Transmitted by whiteflies,Use Imidacloprid; grow resistant varieties,Groundnut,Maize,Moong,Black gram
+14,Pea,Downy Mildew,Whitish fungal growth on lower leaf surface,Peronospora viciae fungus,Use Metalaxyl; avoid overcrowding,Gram,Lentil,Mustard,Wheat
+15,Cabbage,Black Rot,Yellow V-shaped lesions on leaf edges,Xanthomonas campestris bacterium,Use Copper fungicide; avoid wet leaves,Cauliflower,Radish,Turnip,Carrot
+16,Cauliflower,Alternaria Leaf Spot,Dark brown spots with concentric rings,Alternaria brassicae fungus,Spray Mancozeb; crop rotation with non-host crops,Cabbage,Mustard,Spinach,Beetroot
+17,Onion,Purple Blotch,Purple lesions on leaves and stalks,Alternaria porri fungus,Spray Mancozeb or Iprodione; proper spacing,Garlic,Tomato,Brinjal,Chilli
+18,Garlic,White Rot,Yellowing and wilting of leaves,Sclerotium cepivorum fungus,Use Trichoderma in soil; rotate crops,Onion,Mustard,Pea,Carrot
+19,Turmeric,Leaf Blotch,Brown lesions with yellow halos on leaves,Taphrina maculans fungus,Use Mancozeb or Copper oxychloride spray,Ginger,Sugarcane,Maize
+20,Ginger,Bacterial Wilt,Wilting and yellowing of leaves,Ralstonia solanacearum bacterium,Use Streptocycline; remove infected plants,Turmeric,Cardamom,Paddy
+21,Papaya,Ring Spot Virus,Dark green concentric rings on leaves and fruits,Papaya ring spot virus,Remove infected plants; control aphids,Banana,Mango,Guava
+22,Guava,Anthracnose,Black lesions on fruit surface,Colletotrichum gloeosporioides fungus,Use Carbendazim spray; prune infected branches,Mango,Papaya,Lemon
+23,Pomegranate,Bacterial Blight,Dark brown spots on leaves and fruit cracks,Xanthomonas axonopodis bacterium,Use Copper oxychloride or Streptocycline,Guava,Mango,Orange
+24,Orange,Canker,Lesions on leaves and fruits,Xanthomonas citri bacterium,Spray Copper-based fungicide; prune infected parts,Lemon,Guava,Papaya
+25,Lemon,Greening Disease,Yellowing and leaf mottling,Candidatus Liberibacter asiaticus bacterium,Use tetracycline antibiotics; control psyllid,Orange,Mango,Guava
+26,Apple,Scab,Olive-green spots on leaves,Venturia inaequalis fungus,Use Mancozeb or Captan; avoid wet conditions,Pear,Peach,Plum
+27,Tea,Blister Blight,Transparent blisters on young leaves,Exobasidium vexans fungus,Use Copper fungicides; prune infected shoots,Coffee,Cardamom,Areca nut
+28,Coffee,Leaf Rust,Yellow-orange powdery spots on leaves,Hemileia vastatrix fungus,Use Copper oxychloride or systemic fungicides,Tea,Cardamom,Coconut
+29,Pigeon pea,Sterility Mosaic,Leaves become small and leathery,Pigeon pea sterility mosaic virus,Use resistant varieties; control mites,Groundnut,Moong,Soybean
+30,Sorghum,Grain Mold,Discoloration and mold on grains,Curvularia and Fusarium fungi,Use Thiram-treated seeds; avoid late sowing,Maize,Millet,Bajra
