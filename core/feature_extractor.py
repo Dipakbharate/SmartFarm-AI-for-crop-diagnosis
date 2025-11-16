@@ -97,10 +97,13 @@ class FeatureExtractor:
 
         # 🩹 PATCH: Handle Sequential models with no defined input
         try:
-            if not hasattr(self._base_model, "inputs") or self._base_model.input is None:
-                dummy_input = np.zeros((1, 128, 128, 3), dtype=np.float32)
-                _ = self._base_model(dummy_input)
-                logger.info("✅ Warmed up model to define input tensor.")
+            input_shape = self._base_model.layers[0].input_shape[0]
+            if input_shape[1] and input_shape[2]:
+                h, w = input_shape[1], input_shape[2]
+            else:
+                h, w = 128, 128
+            dummy_input = np.zeros((1, h, w, 3), dtype=np.float32)
+            
         except Exception as e:
             logger.warning("⚠️ Model warm-up failed (non-fatal): %s", e)
 

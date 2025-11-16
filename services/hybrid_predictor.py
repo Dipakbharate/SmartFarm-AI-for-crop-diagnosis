@@ -6,9 +6,9 @@ Master orchestrator for SmartFarm AI.
 Pipeline:
 1️⃣ CNN model predicts disease from image.
 2️⃣ If CNN confidence is high → Grok LLM explains result.
-3️⃣ If CNN confidence is low → Gemini Vision analyzes image → Grok refines explanation.
+3️⃣ If CNN confidence is low → Gemini Vision analyzes image (auto or user crop) → Grok refines explanation.
 4️⃣ All embeddings are stored in ChromaDB PersistentClient cache for fast lookup.
-5️⃣ If both fail → Query ChromaDB Knowledge Base (RAG) for a fallback answer.
+5️⃣ If both fail → Query ChromaDB Knowledge Base (RAG) for fallback.
 6️⃣ MemoryService (JSON) used only as backup when ChromaDB unavailable.
 
 Author: SmartFarm AI Team
@@ -38,11 +38,12 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 # Confidence thresholds
-CNN_CONF_THRESHOLD = 0.85
-VISION_CONF_THRESHOLD = 0.70
+CNN_CONF_THRESHOLD = 0.70
+VISION_CONF_THRESHOLD = 0.50
+
 
 # --------------------------------------------------------
-# ChromaDB setup (Persistent cache for embeddings)
+# ChromaDB setup
 # --------------------------------------------------------
 try:
     CHROMA_PATH = Path(__file__).resolve().parents[1] / "data" / "memory_db"
@@ -54,12 +55,13 @@ except Exception as e:
     _HAS_CHROMA = False
     logger.warning("⚠️ ChromaDB unavailable: %s", e)
 
+
 # --------------------------------------------------------
-# Helper: build user-friendly response payload
+# Helper: build response payload
 # --------------------------------------------------------
 def _build_response(stage: str, text: str, meta: Optional[Dict[str, Any]] = None):
     return {
-        "stage": stage,      # cnn_grok / gemini_vision_grok / chroma_rag / error
+        "stage": stage,
         "message": text,
         "metadata": meta or {},
         "timestamp": datetime.now().isoformat(),
@@ -69,13 +71,8 @@ def _build_response(stage: str, text: str, meta: Optional[Dict[str, Any]] = None
 # ========================================================
 # Core pipeline
 # ========================================================
-def hybrid_predict(image_path: str) -> Dict[str, Any]:
-    """
-    Main inference orchestration.
-    Automatically routes low-confidence CNN predictions
-    through Gemini Vision → Grok fallback.
-    """
-
+def hybrid_predict(image_path: str, user_crop: Optional[str] = None) -> Dict[str, Any]:
+    """Main SmartFarm inference orchestrator with optional user crop input."""
     path = Path(image_path)
     if not path.exists():
         msg = f"Image not found: {path}"
@@ -91,47 +88,35 @@ def hybrid_predict(image_path: str) -> Dict[str, Any]:
     try:
         label, conf, topk = predict_image(str(path))
         logger.info("🧠 CNN predicted %s (%.2f%%)", label, conf * 100)
-
-        # ✅ compute fresh embedding immediately after CNN
         emb = extractor.extract_from_path(str(path))
-
     except Exception as e:
         logger.exception("CNN prediction failed: %s", e)
         label, conf, topk, emb = None, 0.0, [], None
+
     # ====================================================
     # STEP 1.5: CHROMA CACHE LOOKUP
     # ====================================================
     try:
-        results = image_cache.query(query_embeddings=[emb.tolist()], n_results=1)
-        if results and results.get("ids") and results["ids"][0]:
-            # Chroma returns distances (lower = closer); convert to similarity
-            dist = None
-            if "distances" in results and len(results["distances"]) and len(results["distances"][0]):
-                dist = float(results["distances"][0][0])
+        if emb is not None:
+            results = image_cache.query(query_embeddings=[emb.tolist()], n_results=1)
+            if results and results.get("ids") and results["ids"][0]:
+                dist = results.get("distances", [[1.0]])[0][0]
                 sim_score = 1.0 - dist
-            else:
-                sim_score = 0.0  # unknown; skip cached match
-
-            logger.info("🧮 Chroma distance=%.6f similarity≈%.6f", dist if dist is not None else -1.0, sim_score)
-
-            # only accept extremely high similarity as cached (avoid false positives)
-            if sim_score > 0.95:
-                existing = results["metadatas"][0][0]
-                logger.info("🔁 Found cached similar embedding (sim=%.3f) => using cached_result", sim_score)
-                return _build_response(
-                    "cached_result",
-                    existing.get("diagnosis", "Previously diagnosed case"),
-                    {"similarity": sim_score, "metadata": existing},
-                )
+                if sim_score > 0.95:
+                    existing = results["metadatas"][0][0]
+                    logger.info("🔁 Cached result used (sim=%.3f)", sim_score)
+                    return _build_response(
+                        "cached_result",
+                        existing.get("diagnosis", "Previously diagnosed case"),
+                        {"similarity": sim_score, "metadata": existing},
+                    )
     except Exception as e:
-        logger.warning("Chroma cache lookup failed (non-fatal): %s", e)
-
+        logger.warning("Chroma cache lookup failed: %s", e)
 
     # ====================================================
-    # STEP 2: DECISION BASED ON CONFIDENCE
+    # STEP 2: HIGH-CONFIDENCE → CNN + GROK
     # ====================================================
     if label and conf >= CNN_CONF_THRESHOLD:
-        # ✅ High-confidence → CNN + Grok
         try:
             response = grok_disease_response(label, conf, topk)
             _store_embedding_cache(image_cache, emb, label, conf)
@@ -144,94 +129,103 @@ def hybrid_predict(image_path: str) -> Dict[str, Any]:
         except Exception as e:
             logger.warning("Grok LLM failed after CNN: %s", e)
 
-    else:
-        # ⚙️ Low confidence → Gemini Vision → Grok
-        try:
-            vision_result = gemini_vision_response(str(path))
-            if vision_result and vision_result.get("confidence", 0) >= VISION_CONF_THRESHOLD:
-                final_text = grok_refine_response(vision_result["description"])
-                _store_embedding_cache(image_cache, emb, label or "unknown", conf)
-                memory.store_diagnosis(str(path), label or "unknown", conf)
-                return _build_response(
-                    "gemini_vision_grok",
-                    final_text,
-                    {"vision_result": vision_result},
-                )
-        except Exception as e:
-            logger.warning("Gemini Vision fallback failed: %s", e)
-
     # ====================================================
-    # STEP 3: CHROMADB KNOWLEDGE BASE (RAG)
+    # STEP 3: LOW-CONFIDENCE → GEMINI + GROK
     # ====================================================
     try:
-        query_text = label if label else "unknown plant disease"
-        kb_results = query_knowledge_base(query_text)
-        if kb_results:
-            top = kb_results[0]
-            text = (
-                f"🌾 Crop: {top['crop']}\n"
-                f"🦠 Disease: {top['disease']}\n"
-                f"🔍 Symptoms: {top['symptoms']}\n"
-                f"💡 Treatment: {top['treatment']}\n"
-                f"🌱 Recommended Crops: {top['recommended']}"
+        vision_result = gemini_vision_response(str(path), user_crop or label or "unknown")
+
+        # --- Normalize confidence to float ---
+        raw_conf = vision_result.get("confidence", 0)
+        try:
+            conf_val = float(raw_conf)
+        except Exception:
+            try:
+                conf_val = float(str(raw_conf).replace("%", "").strip())
+                if conf_val > 1:
+                    conf_val = conf_val / 100.0
+            except Exception:
+                conf_val = 0.0
+
+        logger.info(f"🔍 Gemini returned disease={vision_result.get('disease')} conf={conf_val}")
+
+        if conf_val >= VISION_CONF_THRESHOLD:
+            disease = str(vision_result.get("disease", "unknown")).strip().lower()
+
+            # ✅ Healthy handling
+            if disease == "healthy":
+                msg = (
+                    "✅ The leaf appears **healthy** — no visible signs of disease. "
+                    "Maintain proper irrigation, spacing, and regular monitoring."
+                )
+                _store_embedding_cache(image_cache, emb, "healthy", conf_val)
+                memory.store_diagnosis(str(path), "healthy", conf_val)
+                return _build_response("gemini_vision_grok", msg, {"vision_result": vision_result})
+
+            # 🧠 Grok refinement
+            desc = f"""
+            Crop: {vision_result.get('crop', 'unknown')}
+            Disease: {vision_result.get('disease', 'unknown')}
+            Symptoms: {vision_result.get('symptoms', 'unknown')}
+            Severity: {vision_result.get('severity', 'unknown')}
+            Confidence: {conf_val:.2f}
+
+            Detailed Analysis:
+            {vision_result.get('description', 'No description available')}
+            """
+
+            enriched_prompt = f"""
+            You are an expert agricultural pathologist.
+            Based on this AI Vision Analysis, generate a structured diagnosis with:
+            - **Disease Name**
+            - **Probable Causes**
+            - **Symptoms**
+            - **Treatment Steps (3 short actionable steps)**
+            - **Prevention Tips**
+
+            Respond clearly in markdown for farmers.
+            {desc}
+            """
+
+            final_text = grok_refine_response(enriched_prompt)
+            _store_embedding_cache(image_cache, emb, label or "unknown", conf)
+            memory.store_diagnosis(str(path), label or "unknown", conf)
+
+            logger.info("✅ Stage Triggered: gemini_vision_grok")
+            return _build_response(
+                "gemini_vision_grok",
+                final_text,
+                {"vision_result": vision_result, "cnn_conf": conf_val, "cnn_label": label},
             )
-            if emb is not None:
-                _store_embedding_cache(image_cache, emb, label, conf)
-            return _build_response("chroma_rag", text, {"kb_results": kb_results})
+        else:
+            logger.warning(f"⚠️ Gemini confidence too low ({conf_val:.2f}) — falling back to RAG.")
+
     except Exception as e:
-        logger.exception("ChromaDB knowledge fallback failed: %s", e)
+        logger.warning("Gemini Vision fallback failed: %s", e)
 
     # ====================================================
-    # STEP 4: TOTAL FAILURE
+    # STEP 5: TOTAL FAILURE
     # ====================================================
     msg = (
         "❌ Unable to identify disease confidently. "
-        "Please try uploading a clearer image or specify the crop name."
+        "Try uploading a clearer image or specify the crop name."
     )
     return _build_response("error", msg)
 
 
 # ========================================================
-# Helper: store embedding to ChromaDB cache
+# Helper: Store embedding
 # ========================================================
 def _store_embedding_cache(image_cache, emb: np.ndarray, label: str, conf: float):
-    """
-    Store new embedding into ChromaDB PersistentClient.
-    Also keep minimal JSON record through MemoryService.
-    """
-    if not _HAS_CHROMA:
+    """Safely store new embeddings into ChromaDB cache."""
+    if not _HAS_CHROMA or emb is None:
         return
-
     try:
         img_id = f"img_{datetime.now():%Y%m%d_%H%M%S}"
-        meta = {
-            "diagnosis": label,
-            "confidence": conf,
-            "timestamp": datetime.now().isoformat(),
-        }
-        image_cache.add(
-            ids=[img_id],
-            embeddings=[emb.tolist()],
-            metadatas=[meta],
-        )
-        logger.info("💾 Cached embedding to ChromaDB: %s (%.2f%%)", label, conf * 100)
+        meta = {"diagnosis": label, "confidence": conf, "timestamp": datetime.now().isoformat()}
+        existing = image_cache.query(query_embeddings=[emb.tolist()], n_results=1)
+        if not existing or not existing.get("ids") or existing["ids"][0] == []:
+            image_cache.add(ids=[img_id], embeddings=[emb.tolist()], metadatas=[meta])
+            logger.info("💾 Cached new embedding: %s (%.2f%%)", label, conf * 100)
     except Exception as e:
-        logger.warning("Failed to store embedding to ChromaDB: %s", e)
-
-
-# ========================================================
-# Manual test
-# ========================================================
-if __name__ == "__main__":
-    import sys
-    sys.stdout.reconfigure(encoding='utf-8')
-
-    test_image = "data/uploads/sample_leaf.JPG"
-    result = hybrid_predict(test_image)
-    print("\n=============================")
-    print("Stage:", result["stage"])
-    print("-----------------------------")
-    print(result["message"])
-    print("=============================")
-
-
+        logger.warning("Failed to store embedding: %s", e)
