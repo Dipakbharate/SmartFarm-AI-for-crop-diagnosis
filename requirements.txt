@@ -1,0 +1,7 @@
+streamlit
+numpy
+chromadb
+Pillow
+python-dotenv
+google-generativeai
+tensorflow-cpu
