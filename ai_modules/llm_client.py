@@ -1,13 +1,13 @@
+
 """
 ai_modules/llm_client.py
 ------------------------------------------------------------
 Handles communication with external Large Language Models (LLMs)
 like Gemini Vision and Grok.
 
-Modified pipeline:
-    - CNN prediction explanation → Grok
-    - Vision analysis → Gemini Vision
-    - Refinement / fallback → Grok
+    - CNN prediction explanation → Expert AI
+    - Vision analysis → Advanced Vision
+    - Refinement → Expert AI
 
 Environment Variables:
     GEMINI_API_KEY   -> for Google Gemini Vision API
@@ -24,7 +24,7 @@ import time
 from typing import Dict, Any
 from dotenv import load_dotenv
 import google.generativeai as genai
-from chromadb.utils import embedding_functions
+
 
 # ------------------------------------------------------------
 # Load environment variables
@@ -45,7 +45,7 @@ from ai_modules.prompt_templates import (
 # ------------------------------------------------------------
 try:
     genai.configure(api_key=os.getenv("GOOGLE_API_KEY", "YOUR_GEMINI_API_KEY_HERE"))
-    google_model = genai.GenerativeModel("gemini-2.5-pro")
+    google_model = genai.GenerativeModel("gemini-2.5-flash")
 except Exception as e:
     google_model = None
     print(f"⚠️ Gemini model initialization failed: {e}")
@@ -75,10 +75,10 @@ else:
 # ============================================================
 # 1️⃣ CNN → Grok Explanation
 # ============================================================
-def grok_disease_response(label: str, confidence: float, topk: list) -> str:
+def grok_disease_response(label: str, confidence: float, topk: list, user_crop: str = None) -> str:
     """Generate a natural-language explanation for CNN-predicted disease."""
     if not _HAS_GROK or not GROK_API_KEY:
-        logger.info("Using mock Grok CNN response (offline mode).")
+        logger.info("Using mock AI CNN response (offline mode).")
         return (
             f"The plant likely suffers from {label} (confidence {confidence*100:.1f}%). "
             "Ensure proper watering, improve air circulation, and apply a suitable fungicide."
@@ -86,12 +86,7 @@ def grok_disease_response(label: str, confidence: float, topk: list) -> str:
 
     try:
         client = Groq(api_key=GROK_API_KEY)
-        prompt = (
-            f"The CNN model identified the disease as '{label}' "
-            f"with {confidence*100:.1f}% confidence.\n\n"
-            "Explain what this disease is, its causes, and provide 3 clear treatment "
-            "steps suitable for farmers in simple language."
-        )
+        prompt = disease_explanation_prompt(label, confidence, user_crop)
         completion = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": prompt}],
@@ -129,18 +124,7 @@ def gemini_vision_response(image_path: str, user_crop: str = None) -> dict:
         if image.size[0] > 1024 or image.size[1] > 1024:
             image = image.resize((1024, 1024), Image.Resampling.LANCZOS)
 
-        prompt = f"""
-        You are an expert agricultural pathologist.
-        Analyze this crop leaf image and determine:
-        1. Crop type (Tomato, Potato, Rice, Cotton, etc.)
-        2. Health status (Healthy / Diseased)
-        3. Disease name (if any)
-        4. Confidence (0–1 or %)
-        5. Severity (Mild / Moderate / Severe)
-        6. Symptoms (visible signs)
-        7. Recommended Treatment (3 steps)
-        8. Prevention Tips
-        """
+        prompt = vision_analysis_prompt(user_crop)
 
         # ✅ Single Gemini call for both crop + disease
         response = google_model.generate_content([prompt, image])
@@ -184,16 +168,16 @@ def gemini_vision_response(image_path: str, user_crop: str = None) -> dict:
             "crop": "Unknown",
             "disease": "Error",
             "confidence": 0.0,
-            "description": f"❌ Gemini vision failed: {str(e)}",
+            "description": f"❌ Advanced Vision Analysis failed: {str(e)}",
         }
 
 
 # ============================================================
 # 3️⃣ Grok Refinement (Vision / RAG)
 # ============================================================
-def grok_refine_response(text: str) -> str:
+def grok_refine_response(text: str, user_crop: str = None) -> str:
     """Refine a given text into farmer-friendly explanation."""
-    prompt = refinement_prompt(text)
+    prompt = refinement_prompt(text, user_crop)
 
     if GROK_API_KEY and _HAS_GROK:
         try:
@@ -208,7 +192,7 @@ def grok_refine_response(text: str) -> str:
         except Exception as e:
             logger.warning("Grok refinement failed: %s", e)
 
-    logger.info("Using offline Grok refinement fallback.")
+    logger.info("Using offline AI refinement fallback.")
     return f"{text}\n\n👉 Tip: Monitor nearby plants and apply organic fungicide if symptoms spread."
 
 
@@ -227,3 +211,4 @@ if __name__ == "__main__":
     print("\n💬 Testing Grok refinement...")
     refined = grok_refine_response("Detected fungal infection on the leaf.")
     print("\nRefined output:\n", refined)
+

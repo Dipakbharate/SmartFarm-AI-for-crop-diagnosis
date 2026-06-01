@@ -39,3 +39,4 @@ smart_farm_ai/
 │
 └── logs/
     └── ingestion/                        # logs from KB ingestion (timestamps, counts)
+
